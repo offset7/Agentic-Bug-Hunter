@@ -877,7 +877,8 @@ def main():
     cfg = load_config()
     for env_var in ("GROQ_API_KEY", "DEEPSEEK_API_KEY", "ANTHROPIC_API_KEY",
                     "OPENAI_API_KEY", "XAI_API_KEY", "OPENROUTER_API_KEY",
-                    "ORCAROUTER_API_KEY", "FLUXION_API_KEY", "REQUESTY_API_KEY"):
+                    "ORCAROUTER_API_KEY", "FLUXION_API_KEY", "REQUESTY_API_KEY",
+                    "ZAI_API_KEY"):
         if not os.environ.get(env_var) and cfg.get(env_var):
             os.environ[env_var] = cfg[env_var]
 
