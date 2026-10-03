@@ -21,6 +21,7 @@ def brain_module(monkeypatch):
         "BRAIN_PROVIDER", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "XAI_API_KEY",
         "OPENROUTER_API_KEY", "ORCAROUTER_API_KEY", "FLUXION_API_KEY",
         "REQUESTY_API_KEY", "REQUESTY_BASE_URL",
+        "ZAI_API_KEY", "ZAI_BASE_URL",
     ):
         monkeypatch.delenv(env, raising=False)
     import brain
@@ -245,3 +246,57 @@ def test_requesty_base_url_override(brain_module, monkeypatch):
 
 def test_requesty_is_opt_in_only(brain_module):
     assert "requesty" not in brain_module.LLMClient.PROVIDER_PRIORITY
+
+
+def test_zai_key_jumps_to_front(brain_module, monkeypatch):
+    monkeypatch.setenv("ZAI_API_KEY", "zai-test")
+    client = brain_module.LLMClient.__new__(brain_module.LLMClient)
+    client.available = False
+    tracker = _Tracker(available_provider="zai")
+    tracker.bind(client)
+
+    chosen = brain_module.LLMClient._auto_detect(client)
+
+    assert chosen == "zai"
+    assert tracker.calls[0] == "zai"
+
+
+def test_zai_init_sets_coding_plan_api_base(brain_module, monkeypatch):
+    monkeypatch.setenv("ZAI_API_KEY", "zai-test")
+    client = brain_module.LLMClient.__new__(brain_module.LLMClient)
+    client.available = False
+    client._ollama = None
+    client._http = None
+    client.description = ""
+    client.provider = "zai"
+
+    brain_module.LLMClient._init_provider(client, "zai")
+
+    assert client.available is True
+    assert client._api_base == "https://api.z.ai/api/coding/paas/v4"
+    assert "z.ai" in client.description.lower()
+    assert brain_module.LLMClient.DEFAULT_MODELS["zai"] == "glm-5.3"
+    assert "glm-5.3" in brain_module.LLMClient.list_models(client)
+
+
+def test_zai_base_url_override(brain_module, monkeypatch):
+    monkeypatch.setenv("ZAI_API_KEY", "zai-test")
+    monkeypatch.setenv("ZAI_BASE_URL", "https://api.z.ai/api/paas/v4/")
+    client = brain_module.LLMClient.__new__(brain_module.LLMClient)
+    client.available = False
+    client._http = None
+    client.description = ""
+
+    brain_module.LLMClient._init_provider(client, "zai")
+
+    assert client._api_base == "https://api.z.ai/api/paas/v4"
+
+
+def test_zai_legacy_model_aliases_resolve(brain_module):
+    aliases = brain_module.LLMClient.ZAI_LEGACY_ALIASES
+    assert aliases["glm-4.6"] == "glm-5.3"
+    assert aliases["glm-4.7"] == "glm-5.3-flash"
+
+
+def test_zai_is_opt_in_only(brain_module):
+    assert "zai" not in brain_module.LLMClient.PROVIDER_PRIORITY

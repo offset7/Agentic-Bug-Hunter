@@ -28,6 +28,10 @@ Providers (auto-detected, first available wins):
          requesty   - multi-model gateway, set REQUESTY_API_KEY
                     get key: https://app.requesty.ai/api-keys
                     docs: https://docs.requesty.ai
+         zai        — Z.AI GLM Coding Plan, set ZAI_API_KEY
+                    get key: https://z.ai/manage-apikey/apikey-list
+                    docs: https://docs.z.ai/devpack/overview
+                    override endpoint with ZAI_BASE_URL
 
 Usage:
   ./engine.py setup                        one-time config wizard
@@ -272,6 +276,7 @@ def cmd_setup(args):
         "9":  ("fluxion",    "Fluxion    (multi-model)       — needs FLUXION_API_KEY"),
         "10": ("litellm",    "LiteLLM    (100+ providers)    — uses per-provider keys or LITELLM_API_KEY"),
         "11": ("requesty",   "Requesty   (multi-model)       - needs REQUESTY_API_KEY"),
+        "12": ("zai",        "Z.AI       (GLM Coding Plan)   — needs ZAI_API_KEY"),
     }
 
     requested_provider = (
@@ -308,6 +313,7 @@ def cmd_setup(args):
         "orcarouter": "ORCAROUTER_API_KEY",
         "fluxion":    "FLUXION_API_KEY",
         "requesty":   "REQUESTY_API_KEY",
+        "zai":        "ZAI_API_KEY",
     }
 
     if provider in env_map:
@@ -411,6 +417,7 @@ def cmd_providers(args):
         "orcarouter": "ORCAROUTER_API_KEY",
         "fluxion":    "FLUXION_API_KEY",
         "requesty":   "REQUESTY_API_KEY",
+        "zai":        "ZAI_API_KEY",
     }
     tier = {
         "ollama": "FREE (local)", "groq": "FREE tier",
@@ -420,6 +427,7 @@ def cmd_providers(args):
         "orcarouter": "subscription",
         "fluxion": "subscription",
         "requesty": "pay-as-you-go",
+        "zai": "subscription",
     }
 
     print(f"\n  {'PROVIDER':<12} {'TIER':<16} {'STATUS':<20} {'NOTE'}")

@@ -5,13 +5,13 @@ from __future__ import annotations
 Brain — Multi-Provider LLM Reasoning Layer for Bug Bounty & VAPT
 Supports: Ollama (local), Claude, OpenAI, Grok, Groq, DeepSeek,
           Gemini, Kimi (Moonshot), Mistral, Together AI, Cerebras, Perplexity,
-          OpenRouter, OrcaRouter, Fluxion, Requesty
+          OpenRouter, OrcaRouter, Fluxion, Requesty, Z.AI (GLM Coding Plan)
 
 Provider selection (in order of precedence):
   1. BRAIN_PROVIDER env var  (ollama | claude | openai | grok | groq | deepseek |
                                gemini | kimi | mistral | together | cerebras |
                                perplexity | openrouter | orcarouter | fluxion |
-                               requesty)
+                               requesty | zai)
   2. Auto-detect: uses first provider whose API key / server is available
 
 Model selection:
@@ -38,6 +38,10 @@ API keys (env vars):
   REQUESTY_API_KEY    - Requesty (multi-model gateway, anthropic/claude-sonnet-4-6, etc.)
   REQUESTY_BASE_URL   - Requesty base URL (default: https://router.requesty.ai/v1,
                         EU: https://router.eu.requesty.ai/v1)
+  ZAI_API_KEY         — Z.AI GLM Coding Plan (glm-5.3 / glm-5.3-flash)
+  ZAI_BASE_URL        — Z.AI base URL (default: https://api.z.ai/api/coding/paas/v4
+                        for the Coding Plan; standard API:
+                        https://api.z.ai/api/paas/v4)
   OLLAMA_HOST         — Ollama base URL (default: http://localhost:11434)
 
 Default model priority (uses first available):
@@ -209,6 +213,7 @@ class LLMClient:
         "orcarouter":  "openai/gpt-4o",
         "fluxion":     "openai/gpt-4o",
         "requesty":    "anthropic/claude-sonnet-4-6",
+        "zai":         "glm-5.3",
         "litellm":     "gpt-4o",
         "ollama":      None,  # resolved dynamically
     }
@@ -248,6 +253,20 @@ class LLMClient:
         "llama-3.1-8b-instant":    "openai/gpt-oss-20b",
     }
 
+    # Z.AI's GLM Coding Plan auto-routes older GLM ids server-side: GLM-5.2 /
+    # GLM-5.1 → GLM-5.3, and GLM-4.7 → GLM-5.3-Flash. Mirror that mapping here
+    # so saved configs / `--model glm-4.6` keep resolving to a live model
+    # instead of surfacing a routed-but-surprising id. Lowercased to match the
+    # api model ids.
+    ZAI_LEGACY_ALIASES = {
+        "glm-5.2":       "glm-5.3",
+        "glm-5.1":       "glm-5.3",
+        "glm-4.7":       "glm-5.3-flash",
+        "glm-4.6":       "glm-5.3",
+        "glm-4.5":       "glm-5.3",
+        "glm-4.5-air":   "glm-5.3-flash",
+    }
+
     def __init__(self, provider: str | None = None, model: str | None = None):
         self.provider    = (provider or os.environ.get("BRAIN_PROVIDER", "")).lower()
         self.model       = model or os.environ.get("BRAIN_MODEL") or None
@@ -278,6 +297,7 @@ class LLMClient:
         "orcarouter":  "ORCAROUTER_API_KEY",
         "fluxion":     "FLUXION_API_KEY",
         "requesty":    "REQUESTY_API_KEY",
+        "zai":         "ZAI_API_KEY",
         # Kept last so auto-detect only reaches LiteLLM when LITELLM_API_KEY is
         # set, and never preempts a directly-configured provider above.
         "litellm":     "LITELLM_API_KEY",
@@ -526,6 +546,21 @@ class LLMClient:
             self.available   = True
             self.description = "Requesty (multi-model gateway)"
 
+        elif provider == "zai":
+            key = os.environ.get("ZAI_API_KEY", "")
+            if not key:
+                return
+            import requests
+            self._http = requests.Session()
+            self._http.headers.update({"Authorization": f"Bearer {key}",
+                                       "Content-Type": "application/json"})
+            # GLM Coding Plan's OpenAI-compatible endpoint. Override with
+            # ZAI_BASE_URL to target the standard API (…/api/paas/v4) instead.
+            self._api_base   = (os.environ.get("ZAI_BASE_URL", "")
+                                or "https://api.z.ai/api/coding/paas/v4").rstrip("/")
+            self.available   = True
+            self.description = "Z.AI GLM Coding Plan (glm-5.3 / glm-5.3-flash)"
+
         elif provider == "litellm":
             # LiteLLM routes by the model-name prefix (e.g. "anthropic/claude-...",
             # "gemini/gemini-...", "bedrock/...") and reads each target provider's
@@ -557,7 +592,7 @@ class LLMClient:
             elif self.provider in (
                 "openai", "grok", "groq", "deepseek",
                 "gemini", "kimi", "mistral", "together", "cerebras", "perplexity",
-                "openrouter", "orcarouter", "fluxion", "requesty",
+                "openrouter", "orcarouter", "fluxion", "requesty", "zai",
             ):
                 return self._chat_openai_compat(model, system, user, max_tokens, temperature)
         except Exception as e:
@@ -649,6 +684,8 @@ class LLMClient:
             m = self.GROK_LEGACY_ALIASES.get(m, m)
         elif self.provider == "groq":
             m = self.GROQ_LEGACY_ALIASES.get(m, m)
+        elif self.provider == "zai":
+            m = self.ZAI_LEGACY_ALIASES.get(m.lower(), m)
         body = {"model": m, "max_tokens": max_tokens, "temperature": temperature,
                 "messages": [{"role": "system", "content": system},
                              {"role": "user",   "content": user}]}
@@ -753,6 +790,10 @@ class LLMClient:
                 "gemini-3.5-flash",
                 "gpt-4o-mini@eu",
             ]
+        elif self.provider == "zai":
+            # GLM Coding Plan catalog; GLM-5.2/5.1/4.x ids auto-route (see
+            # ZAI_LEGACY_ALIASES). Full list: GET {base}/models.
+            return ["glm-5.3", "glm-5.3-flash"]
         elif self.provider == "litellm":
             return self._litellm_list_models()
         return []
