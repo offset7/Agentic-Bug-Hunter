@@ -382,9 +382,20 @@ def cmd_setup(args):
 
         save_config(cfg)
         ok(f"Config saved to {CONFIG}")
+        # Use a generous ceiling: reasoning models (GLM, DeepSeek-thinking, o1)
+        # spend tokens thinking before any visible content, so a tiny cap makes
+        # a successful call look empty. 256 leaves room for the reply to appear.
         reply = client.chat(selected_model, "You are a helpful assistant.",
-                            "Reply with exactly: READY", max_tokens=10)
-        ok(f"Model responded: {reply.strip()}" if reply else "Connected (no reply — pull a model if using Ollama)")
+                            "Reply with exactly: READY", max_tokens=256)
+        if reply:
+            ok(f"Model responded: {reply.strip()}")
+        elif provider == "ollama":
+            ok("Connected (no reply — pull a model first)")
+        else:
+            warn("Connected, but the test chat returned no text. The key and "
+                 "endpoint are accepted; if hunts produce empty analysis, check "
+                 "your model name and plan (see any [Brain/" + provider +
+                 "] error above).")
     else:
         if not requested_model:
             save_config(cfg)
