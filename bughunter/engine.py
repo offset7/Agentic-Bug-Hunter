@@ -28,6 +28,10 @@ Providers (auto-detected, first available wins):
          requesty   - multi-model gateway, set REQUESTY_API_KEY
                     get key: https://app.requesty.ai/api-keys
                     docs: https://docs.requesty.ai
+         zai        — Z.AI GLM Coding Plan, set ZAI_API_KEY
+                    get key: https://z.ai/manage-apikey/apikey-list
+                    docs: https://docs.z.ai/devpack/overview
+                    override endpoint with ZAI_BASE_URL
 
 Usage:
   ./engine.py setup                        one-time config wizard
@@ -272,6 +276,7 @@ def cmd_setup(args):
         "9":  ("fluxion",    "Fluxion    (multi-model)       — needs FLUXION_API_KEY"),
         "10": ("litellm",    "LiteLLM    (100+ providers)    — uses per-provider keys or LITELLM_API_KEY"),
         "11": ("requesty",   "Requesty   (multi-model)       - needs REQUESTY_API_KEY"),
+        "12": ("zai",        "Z.AI       (GLM Coding Plan)   — needs ZAI_API_KEY"),
     }
 
     requested_provider = (
@@ -308,6 +313,7 @@ def cmd_setup(args):
         "orcarouter": "ORCAROUTER_API_KEY",
         "fluxion":    "FLUXION_API_KEY",
         "requesty":   "REQUESTY_API_KEY",
+        "zai":        "ZAI_API_KEY",
     }
 
     if provider in env_map:
@@ -376,9 +382,20 @@ def cmd_setup(args):
 
         save_config(cfg)
         ok(f"Config saved to {CONFIG}")
+        # Use a generous ceiling: reasoning models (GLM, DeepSeek-thinking, o1)
+        # spend tokens thinking before any visible content, so a tiny cap makes
+        # a successful call look empty. 256 leaves room for the reply to appear.
         reply = client.chat(selected_model, "You are a helpful assistant.",
-                            "Reply with exactly: READY", max_tokens=10)
-        ok(f"Model responded: {reply.strip()}" if reply else "Connected (no reply — pull a model if using Ollama)")
+                            "Reply with exactly: READY", max_tokens=256)
+        if reply:
+            ok(f"Model responded: {reply.strip()}")
+        elif provider == "ollama":
+            ok("Connected (no reply — pull a model first)")
+        else:
+            warn("Connected, but the test chat returned no text. The key and "
+                 "endpoint are accepted; if hunts produce empty analysis, check "
+                 "your model name and plan (see any [Brain/" + provider +
+                 "] error above).")
     else:
         if not requested_model:
             save_config(cfg)
@@ -411,6 +428,7 @@ def cmd_providers(args):
         "orcarouter": "ORCAROUTER_API_KEY",
         "fluxion":    "FLUXION_API_KEY",
         "requesty":   "REQUESTY_API_KEY",
+        "zai":        "ZAI_API_KEY",
     }
     tier = {
         "ollama": "FREE (local)", "groq": "FREE tier",
@@ -420,6 +438,7 @@ def cmd_providers(args):
         "orcarouter": "subscription",
         "fluxion": "subscription",
         "requesty": "pay-as-you-go",
+        "zai": "subscription",
     }
 
     print(f"\n  {'PROVIDER':<12} {'TIER':<16} {'STATUS':<20} {'NOTE'}")
@@ -858,7 +877,8 @@ def main():
     cfg = load_config()
     for env_var in ("GROQ_API_KEY", "DEEPSEEK_API_KEY", "ANTHROPIC_API_KEY",
                     "OPENAI_API_KEY", "XAI_API_KEY", "OPENROUTER_API_KEY",
-                    "ORCAROUTER_API_KEY", "FLUXION_API_KEY", "REQUESTY_API_KEY"):
+                    "ORCAROUTER_API_KEY", "FLUXION_API_KEY", "REQUESTY_API_KEY",
+                    "ZAI_API_KEY"):
         if not os.environ.get(env_var) and cfg.get(env_var):
             os.environ[env_var] = cfg[env_var]
 

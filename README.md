@@ -229,8 +229,9 @@ bughunter v "finding"        # short alias for validate
 | **Fluxion** | Subscription / pay-as-you-go | Cloud | Fast | [fluxionai.world](https://fluxionai.world/register?source=github&campaign=github-awarexone&promo=AWAREXONE) → get API key · [docs](https://docs.fluxionai.world/user-guide/help-center) · [Model Plaza](https://fluxionai.world/model-plaza) |
 | **LiteLLM** | Uses your existing provider keys | Cloud / self-hosted proxy | Fast | [docs.litellm.ai](https://docs.litellm.ai) → one gateway for 100+ models |
 | **Requesty** | Pay-as-you-go | Cloud | Fast | [app.requesty.ai/api-keys](https://app.requesty.ai/api-keys) → get API key · [docs](https://docs.requesty.ai) |
+| **Z.AI** | GLM Coding Plan (subscription) | Cloud | Fast | [z.ai](https://z.ai/manage-apikey/apikey-list) → get API key · [docs](https://docs.z.ai/devpack/overview) → `glm-5.3` / `glm-5.3-flash` |
 
-BugHunter auto-detects providers in this order: **Ollama → Groq → DeepSeek → … → OrcaRouter → OpenRouter → Fluxion → Claude → OpenAI**. LiteLLM is opt-in (selected explicitly or when `LITELLM_API_KEY` is set) so it never preempts a provider you already configured. Requesty is opt-in the same way (selected explicitly or when `REQUESTY_API_KEY` is set); set `REQUESTY_BASE_URL=https://router.eu.requesty.ai/v1` to route through the EU region.
+BugHunter auto-detects providers in this order: **Ollama → Groq → DeepSeek → … → OrcaRouter → OpenRouter → Fluxion → Claude → OpenAI**. LiteLLM is opt-in (selected explicitly or when `LITELLM_API_KEY` is set) so it never preempts a provider you already configured. Requesty is opt-in the same way (selected explicitly or when `REQUESTY_API_KEY` is set); set `REQUESTY_BASE_URL=https://router.eu.requesty.ai/v1` to route through the EU region. Z.AI is opt-in too (selected explicitly or when `ZAI_API_KEY` is set); it defaults to the GLM Coding Plan endpoint (`https://api.z.ai/api/coding/paas/v4`), overridable with `ZAI_BASE_URL` (e.g. the standard API `https://api.z.ai/api/paas/v4`).
 
 Switch providers or choose an installed Ollama model anytime: `bughunter setup`.
 The setup can also be fully non-interactive:
@@ -288,6 +289,27 @@ bughunter hunt target.com
 
 # Or one-off:
 bughunter --provider fluxion --model openai/gpt-4o hunt target.com
+```
+
+### Z.AI setup (GLM Coding Plan)
+
+Z.AI's [GLM Coding Plan](https://docs.z.ai/devpack/overview) exposes an OpenAI-compatible endpoint (`https://api.z.ai/api/coding/paas/v4`). It is **not** the default provider — pick it in `bughunter setup`, or set `BRAIN_PROVIDER=zai` when you want it. Older GLM ids (`glm-4.6`, `glm-5.2`, …) are auto-routed to `glm-5.3` / `glm-5.3-flash`.
+
+```bash
+# 1. Subscribe to a GLM Coding Plan and create an API key
+#    https://z.ai/manage-apikey/apikey-list
+#    Docs: https://docs.z.ai/devpack/overview
+
+export ZAI_API_KEY="your-key-here"
+./install.sh --agent standalone
+bughunter setup --provider zai --model glm-5.3
+bughunter hunt target.com
+
+# Or one-off:
+bughunter --provider zai --model glm-5.3 hunt target.com
+
+# Not on the Coding Plan? Point at the standard API instead:
+export ZAI_BASE_URL="https://api.z.ai/api/paas/v4"
 ```
 
 ---
